@@ -1,0 +1,116 @@
+(* Integer and Float definitions *)
+integer = [ "-" ] , ( "0x" , hex_digit , { hex_digit } , [ integer_suffix ]
+                      | "0o" , octal_digit , { octal_digit } , [ integer_suffix ]
+                      | "0b" , binary_digit , { binary_digit } , [ integer_suffix ]
+                      | decimal_digit , { decimal_digit } , [ integer_suffix ] ) ;
+
+float = [ "-" ] , ( decimal_digit , { decimal_digit } , "." , { decimal_digit } , [ exponent ] , [ float_suffix ]
+                    | "0x" , hex_digit , { hex_digit } , "." , { hex_digit } , [ exponent ] , [ float_suffix ] ) ;
+
+(* Common components *)
+exponent = ( "e" | "E" ) , [ "+" | "-" ] , decimal_digit , { decimal_digit } ;
+integer_suffix = "u8" | "u16" | "u32" | "u64" | "u128" | "i8" | "i16" | "i32" | "i64" | "i128" ;
+float_suffix = "f32" | "f64" | "f80" | "f128" ;
+
+(* Digit definitions *)
+decimal_digit = "0" | non_zero_digit ;
+hex_digit = decimal_digit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F" ;
+octal_digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" ;
+binary_digit = "0" | "1" ;
+non_zero_digit = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+(* Identifiers *)
+simple_identifier = ( letter | "_" ) , { letter | decimal_digit | "_" } ;
+qualified_identifier = simple_identifier , { "." , simple_identifier } ;
+
+identifier = qualified_identifier ;
+
+(* Generics *)
+generic_parameter = simple_identifier | simple_identifier , "extends" , identifier ;
+generic_parameters = "<" , generic_parameter , { "," , generic_parameter } , ">" ;
+
+(* Literals *)
+literal = ( integer | float ) | ( '"' , { character - '"' } , '"' ) | ( "'" , ( character - "'" ) , "'" ) ;
+
+(* Operators *)
+unary_op = "+" | "-" | "!" | "~" | "ref" | "deref" ;
+
+(* Types *)
+type = base_type, type_suffix ;
+base_type = "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16" | "u32" | "u64" | "u128" 
+           | "f32" | "f64" | "f80" | "f128" | "char" | "bool" 
+           | "struct" , qualified_identifier 
+           | "enum" , qualified_identifier 
+           | qualified_identifier , [ generic_parameters ] ;
+type_suffix = "[" , integer , "]" type_suffix | ε;
+
+
+(* Expressions *)
+expression = logical_or_expr ;
+logical_or_expr = logical_and_expr , { "||" , logical_and_expr } ;
+logical_and_expr = comparison , { "&&" , comparison } ;
+comparison = or_expr , { ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) , or_expr } ;
+or_expr = xor_expr , { "|" , xor_expr } ;
+xor_expr = and_expr , { "^" , and_expr } ;
+and_expr = shift_expr , { "&" , shift_expr } ;
+shift_expr = term , { ( "<<" | ">>" ) , term } ;
+term = factor , { ( "+" | "-" ) , factor } ;
+factor = unary_expr , { ( "*" | "/" | "%" ) , unary_expr } ;
+unary_expr = unary_op , unary_expr | primary ;
+primary = literal | identifier | "(" , expression , ")" ;
+
+(* Function parameters *)
+parameter = type , identifier ;
+parameters = parameter , { "," , parameter } ;
+return_type = "->" , type ;
+
+(* Blocks and Statements *)
+block = "{" , { statement } , "}" ;
+statement = if_statement | loop_statement | var_declaration | expression_statement 
+           | match_statement | break_statement | continue_statement | ret_statement 
+           | asm_block | llvm_block | import_statement | function_call;
+
+import_statement = "import" , identifier ;
+
+asm_block = "asm" , "{" , [ asm_statements ] , "}" ;
+asm_statements = asm_statement , { "," , asm_statement } ;
+asm_statement = STRING , [ "+" , identifier , { "+" , STRING } ] ;
+
+llvm_block = "llvm" , "{" , [ llvm_statements ] , "}" ;
+llvm_statements = llvm_statement , { "," , llvm_statement } ;
+llvm_statement = STRING , { "+" , ( identifier | STRING ) } ;
+
+ret_statement = "ret" , [ expression ] , ";" ;
+if_statement = "if" , "(" , expression , ")" , block , { "elif" , "(" , expression , ")" , block } , [ "else" , block ] ;
+loop_statement = "loop" , block ;
+var_declaration = [ "volatile" ], { "ref" }, type , identifier , [ "=" , expression ] , ";" ;
+expression_statement = expression , ";" ;
+match_statement = "match" , "{" , { case_clause } , [ "_" , "->" , block ] , "}" ;
+case_clause = literal , { "," , literal } , "->" , block ;
+break_statement = "break" , ";" ;
+continue_statement = "continue" , ";" ;
+
+(* Struct and Enum Declarations *)
+struct_declaration = "struct" , simple_identifier , [ generic_parameters ] , 
+                    [ ( "extends" , qualified_identifier ) ] , 
+                    ( "{" , named_fields , "}" | "(" , tuple_fields , ")" , ";" | ";" ) ;
+named_fields = type , simple_identifier , { "," , type , simple_identifier } ;
+tuple_fields = type , { "," , type } ;
+
+enum_declaration = "enum" , simple_identifier , [ generic_parameters ] , 
+                   [ ( "extends" , simple_identifier , { "," , simple_identifier } ) ] , 
+                   "{" , enum_variant , { "," , enum_variant } , "}" ;
+enum_variant = simple_identifier , ( "{" , ( type , simple_identifier , { "," , type , simple_identifier } ) , "}" 
+                     | "(" , ( type , { "," , type } ) , ")" | ";" ) ;
+
+(* Functions *)
+function_declaration = "fn" , identifier , [ generic_parameters ] , "(" , [ parameters ] , ")" , [ return_type ] , block ;
+declaration =  ["pub"] , function_declaration |  ["pub"] , enum_declaration |  ["pub"] , struct_declaration | asm_block | llvm_block ;
+
+function_call = identifier, "(", { expression }, ")", ";" ;
+
+(* Decl Statements *)
+decl_block = "decl" , simple_identifier , [ generic_parameters ] , "{" , { function_declaration } , "}" ;
+decl_declaration = decl_block ;
+
+program = { declaration | decl_declaration } ;
