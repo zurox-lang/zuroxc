@@ -1,3 +1,8 @@
+(*
+ * Zurox Programming Language Gramamr.
+ * Please note that the letters here cover entire valid UTF-8 except the operators and separators.
+ * This has not been defined explicitly in the grammar and is covered for in the compiler.
+ *)
 (* Integer and Float definitions *)
 integer = [ "-" ] , ( "0x" , hex_digit , { hex_digit } , [ integer_suffix ]
                       | "0o" , octal_digit , { octal_digit } , [ integer_suffix ]
@@ -19,33 +24,32 @@ octal_digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" ;
 binary_digit = "0" | "1" ;
 non_zero_digit = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
 
-(* Identifiers *)
-simple_identifier = ( letter | "_" ) , { letter | decimal_digit | "_" } ;
-qualified_identifier = simple_identifier , { "." , simple_identifier } ;
+identifier = ( letter | "_" ) , { letter | decimal_digit | "_" } ;
 
-identifier = qualified_identifier ;
-
-(* Generics *)
-generic_parameter = simple_identifier | simple_identifier , "extends" , identifier ;
+generic_parameter = "type", identifier , [ "impl" , identifier ];
 generic_parameters = "<" , generic_parameter , { "," , generic_parameter } , ">" ;
 
-(* Literals *)
-literal = ( integer | float ) | ( '"' , { character - '"' } , '"' ) | ( "'" , ( character - "'" ) , "'" ) ;
+literal = integer | float | string_literal | char_literal ;
+string_literal = '"' , { character - '"' } , '"' ;
+char_literal = "'" , character , "'" ;
 
-(* Operators *)
 unary_op = "+" | "-" | "!" | "~" | "ref" | "deref" ;
+binary_op = "+" | "-" | "*" | "/" | "%" | "&&" | "||" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "|" | "^" | "&" | "<<" | ">>" ;
 
-(* Types *)
-type = base_type, type_suffix ;
-base_type = "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16" | "u32" | "u64" | "u128" 
-           | "f32" | "f64" | "f80" | "f128" | "char" | "bool" 
-           | "struct" , qualified_identifier 
-           | "enum" , qualified_identifier 
-           | qualified_identifier , [ generic_parameters ] ;
-type_suffix = "[" , integer , "]" type_suffix | ε;
+type = base_type , type_suffix ;
+base_type = primitive_type | user_defined_type ;
+primitive_type = "i8" | "i16" | "i32" | "i64" | "i128"
+               | "u8" | "u16" | "u32" | "u64" | "u128"
+               | "f32" | "f64" | "f80" | "f128" | "char" | "bool" ;
+user_defined_type = struct_type, identifier , [ generic_parameters ] | enum_type , identifier , [ generic_parameters ] | interface_type | "type", identifier;
+struct_type = "struct" , identifier , [ generic_parameters ] ;
+enum_type = "enum" , identifier , [ generic_parameters ] ;
+interface_type = "intf", identifier, [generic_parameters] ;
+type_suffix = array_suffix | pointer_suffix;
+array_suffix = "[" , integer , "]" , [ array_suffix | pointer_suffix ] ;
+pointer_suffix = "ref" , [ pointer_suffix | array_suffix ] ;
+function_call = identifier, [generic_parameters], "(", [ expression , { "," , expression } ] , ")" ;
 
-
-(* Expressions *)
 expression = logical_or_expr ;
 logical_or_expr = logical_and_expr , { "||" , logical_and_expr } ;
 logical_and_expr = comparison , { "&&" , comparison } ;
@@ -57,60 +61,63 @@ shift_expr = term , { ( "<<" | ">>" ) , term } ;
 term = factor , { ( "+" | "-" ) , factor } ;
 factor = unary_expr , { ( "*" | "/" | "%" ) , unary_expr } ;
 unary_expr = unary_op , unary_expr | primary ;
-primary = literal | identifier | "(" , expression , ")" ;
+primary = literal | identifier , [ array_access ] | "(" , expression , ")" | function_call ;
+array_access = "[" , expression , "]" , [ array_access ] ;
 
-(* Function parameters *)
 parameter = type , identifier ;
 parameters = parameter , { "," , parameter } ;
 return_type = "->" , type ;
 
-(* Blocks and Statements *)
 block = "{" , { statement } , "}" ;
-statement = if_statement | loop_statement | var_declaration | expression_statement 
-           | match_statement | break_statement | continue_statement | ret_statement 
-           | asm_block | llvm_block | import_statement | function_call;
+statement = if_statement | loop_statement | var_declaration | ret_statement
+           | match_statement | break_statement | continue_statement
+           | asm_block | llvm_block | import_statement | function_call, ";" | assignment;
 
+assignment = identifier , [ "=" , expression ] , ";" ;
 import_statement = "import" , identifier ;
 
 asm_block = "asm" , "{" , [ asm_statements ] , "}" ;
 asm_statements = asm_statement , { "," , asm_statement } ;
-asm_statement = STRING , [ "+" , identifier , { "+" , STRING } ] ;
+asm_statement = string_literal , [ "+" , identifier , { "+" , string_literal } ] ;
 
 llvm_block = "llvm" , "{" , [ llvm_statements ] , "}" ;
 llvm_statements = llvm_statement , { "," , llvm_statement } ;
-llvm_statement = STRING , { "+" , ( identifier | STRING ) } ;
+llvm_statement = string_literal , { "+" , ( identifier | string_literal ) } ;
 
 ret_statement = "ret" , [ expression ] , ";" ;
 if_statement = "if" , "(" , expression , ")" , block , { "elif" , "(" , expression , ")" , block } , [ "else" , block ] ;
 loop_statement = "loop" , block ;
-var_declaration = [ "volatile" ], { "ref" }, type , identifier , [ "=" , expression ] , ";" ;
-expression_statement = expression , ";" ;
-match_statement = "match" , "{" , { case_clause } , [ "_" , "->" , block ] , "}" ;
+var_declaration = [ ("volatile" | "const") ], type , identifier , [ assignment ] ;
+match_statement = "match" , "{" , { case_clause } , [ "default" , "->" , block ] , "}" ;
 case_clause = literal , { "," , literal } , "->" , block ;
 break_statement = "break" , ";" ;
 continue_statement = "continue" , ";" ;
 
-(* Struct and Enum Declarations *)
-struct_declaration = "struct" , simple_identifier , [ generic_parameters ] , 
-                    [ ( "extends" , qualified_identifier ) ] , 
-                    ( "{" , named_fields , "}" | "(" , tuple_fields , ")" , ";" | ";" ) ;
-named_fields = type , simple_identifier , { "," , type , simple_identifier } ;
+struct_declaration = "struct" , identifier , [ generic_parameters ], "{", [ named_fields ], "}" , ";"
+                    | "struct" , identifier , [ generic_parameters ] , "(" , [ tuple_fields ] , ")" , ";"
+                    | "struct" , identifier , ";" ;
+
+
+named_fields = type , identifier , { "," , type , identifier } ;
+
 tuple_fields = type , { "," , type } ;
 
-enum_declaration = "enum" , simple_identifier , [ generic_parameters ] , 
-                   [ ( "extends" , simple_identifier , { "," , simple_identifier } ) ] , 
+enum_declaration = "enum" , identifier , [ generic_parameters ] ,
                    "{" , enum_variant , { "," , enum_variant } , "}" ;
-enum_variant = simple_identifier , ( "{" , ( type , simple_identifier , { "," , type , simple_identifier } ) , "}" 
-                     | "(" , ( type , { "," , type } ) , ")" | ";" ) ;
 
-(* Functions *)
-function_declaration = "fn" , identifier , [ generic_parameters ] , "(" , [ parameters ] , ")" , [ return_type ] , block ;
-declaration =  ["pub"] , function_declaration |  ["pub"] , enum_declaration |  ["pub"] , struct_declaration | asm_block | llvm_block ;
+enum_variant = identifier , ( "{" , [ named_fields ] , "}" | "(" , [ tuple_fields ] , ")"  |  ";" ) ;
 
-function_call = identifier, "(", { expression }, ")", ";" ;
+function_declaration = ["const"] , "fn" , identifier , [ generic_parameters ] , "(" , [ parameters ] , ")" , [ return_type ] , block ;
+function_call = identifier, [generic_parameters], "(", [ expression , { "," , expression } ] , ")" ;
 
-(* Decl Statements *)
-decl_block = "decl" , simple_identifier , [ generic_parameters ] , "{" , { function_declaration } , "}" ;
-decl_declaration = decl_block ;
+interface_declaration = "intf" , identifier , [ generic_parameters ] ,
+                    "{" , { interface_method } , "}" ;
 
-program = { declaration | decl_declaration } ;
+interface_method = "fn" , identifier , "(" , [ parameters ] , ")" , [ return_type ] ;
+
+interface_implementation = "impl" , interface_type , "for" , base_type , "{" , { method_implementation } , "}" ;
+method_implementation = "fn" , identifier , "(" , [ parameters ] , ")" , [ return_type ] , block ;
+
+declaration =  ["pub"] , function_declaration |  ["pub"] , enum_declaration |  ["pub"] , struct_declaration | ["pub"], interface_declaration | asm_block | llvm_block;
+
+program = { declaration } ;

@@ -9,12 +9,12 @@ pub struct Lexer<'a> {
     has_error: bool,
 }
 
-const DATA_TYPES: [&str; 16] = [
+pub const DATA_TYPES: [&str; 16] = [
     "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64", "f32", "f64", "u128", "i128", "f80",
     "f128", "char", "bool",
 ];
 
-const MAX_DATA_TYPE_LEN: usize = {
+pub const MAX_DATA_TYPE_LEN: usize = {
     let mut max_len = 0;
     let mut i = 0;
     while i < DATA_TYPES.len() {
@@ -27,13 +27,13 @@ const MAX_DATA_TYPE_LEN: usize = {
     max_len
 };
 
-const KEYWORDS: [&str; 23] = [
-    "asm", "if", "elif", "else", "loop", "fn", "ret", "true", "false", "ref", "deref", "extends",
+pub const KEYWORDS: [&str; 27] = [
+    "asm", "if", "elif", "else", "loop", "fn", "ret", "true", "false", "ref", "deref", "impl",
     "struct", "async", "enum", "void", "volatile", "null", "import", "llvm", "break", "continue",
-    "match",
+    "match", "def", "pub", "const", "default",
 ];
 
-const MAX_KEYWORDS_LEN: usize = {
+pub const MAX_KEYWORDS_LEN: usize = {
     let mut max_len = 0;
     let mut i = 0;
     while i < KEYWORDS.len() {
@@ -55,6 +55,10 @@ impl<'a> Lexer<'a> {
             tokens: Vec::new(),
             has_error: false,
         }
+    }
+
+    pub fn has_error(&self) -> bool {
+        self.has_error
     }
 
     fn find_dt(&self, x: &str) -> Option<usize> {
@@ -123,25 +127,19 @@ impl<'a> Lexer<'a> {
             self.advance();
         }
 
-        let token = match str.len() {
-            len if len <= MAX_KEYWORDS_LEN || len <= MAX_DATA_TYPE_LEN => {
-                if self.find_dt(&str).is_some() {
-                    Token::DataType(self.line, self.col - str.len(), str)
-                } else if self.find_keyword(&str).is_some() {
-                    Token::Keyword(self.line, self.col - str.len(), str)
-                } else {
-                    Token::Identifier(self.line, self.col - str.len(), str)
-                }
-            }
-            _ => Token::Identifier(self.line, self.col - str.len(), str),
+        let token = if self.find_dt(&str).is_some() {
+            Token::DataType(self.line, self.col - str.len(), str)
+        } else if self.find_keyword(&str).is_some() {
+            Token::Keyword(self.line, self.col - str.len(), str)
+        } else {
+            Token::Identifier(self.line, self.col - str.len(), str)
         };
 
         self.tokens.push(token);
     }
 
     fn number(&mut self) {
-        let mut str = String::new();
-        str.reserve(8);
+        let mut str = String::with_capacity(8);
 
         if let Some(c) = self.current() {
             if c == '0' {
@@ -336,8 +334,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn handle_operator(&mut self) {
-        let mut op = String::new();
-        op.reserve(3);
+        let mut op = String::with_capacity(1);
 
         if let Some(c) = self.current() {
             if c == '/' {
@@ -350,29 +347,6 @@ impl<'a> Lexer<'a> {
             }
 
             op.push(c);
-
-            if let Some(next_c) = self.peek() {
-                if (c == '>' && next_c == '=')
-                    || (c == '<' && next_c == '=')
-                    || (c == '=' && next_c == '=')
-                    || (c == '!' && next_c == '=')
-                    || (c == '&' && next_c == '&')
-                    || (c == '|' && next_c == '|')
-                    || (c == '+' && next_c == '+')
-                    || (c == '-' && next_c == '-')
-                    || (c == '*' && next_c == '=')
-                    || (c == '/' && next_c == '=')
-                    || (c == '~' && next_c == '=')
-                    || (c == '%' && next_c == '=')
-                    || (c == '^' && next_c == '=')
-                    || (c == '<' && next_c == '<')
-                    || (c == '>' && next_c == '>')
-                {
-                    op.push(next_c);
-                    self.advance();
-                }
-            }
-
             self.tokens.push(Token::Operator(self.line, self.col, op));
             self.advance();
         }
@@ -427,8 +401,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn handle_string_literal(&mut self) {
-        let mut literal = String::new();
-        literal.reserve(128);
+        let mut literal = String::with_capacity(128);
 
         if let Some(c) = self.current() {
             literal.push(c);
@@ -447,6 +420,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 if self.eof() {
+                    self.has_error = true;
                     self.tokens.push(Token::Error(LexerError::UnexpectedEOF(
                         self.line,
                         self.col - literal.len(),
@@ -459,6 +433,7 @@ impl<'a> Lexer<'a> {
             }
 
             if literal.chars().last().expect("Unable to fetch character.") != '"' {
+                self.has_error = true;
                 self.tokens.push(Token::Error(LexerError::UnclosedString(
                     self.line,
                     self.col - literal.len(),
@@ -476,8 +451,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn handle_char_literal(&mut self) {
-        let mut literal = String::new();
-        literal.reserve(4);
+        let mut literal = String::with_capacity(4);
 
         if let Some(c) = self.current() {
             literal.push(c);
@@ -497,6 +471,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 if self.eof() {
+                    self.has_error = true;
                     self.tokens.push(Token::Error(LexerError::UnexpectedEOF(
                         self.line,
                         self.col - literal.len(),
@@ -509,6 +484,7 @@ impl<'a> Lexer<'a> {
             }
 
             if literal.chars().last().expect("Unable to fetch character.") != '\'' {
+                self.has_error = true;
                 self.tokens.push(Token::Error(LexerError::UnclosedCharacter(
                     self.line,
                     self.col - literal.len(),
@@ -548,7 +524,7 @@ mod tests {
 
     fn generate_random_identifier() -> String {
         let mut rng = rand::thread_rng();
-        let len_dist = Uniform::from(1..650);
+        let len_dist = Uniform::from(1..1000);
         let len = len_dist.sample(&mut rng);
 
         let char_dist = Uniform::from(b'a'..=b'z');
@@ -559,14 +535,17 @@ mod tests {
 
     #[test]
     fn test_keywords() {
-        let mut lexer = Lexer::new(
-            "if else ret true false ref deref struct async enum void volatile null import break continue match extends"
-        );
+        let mut input = String::new();
+        for string in KEYWORDS {
+            input.push_str(string);
+            input.push_str(" ");
+        }
+        let mut lexer = Lexer::new(&input);
 
         let tokens = lexer.lex();
-        assert_eq!(tokens.len(), 19);
+        assert_eq!(tokens.len(), KEYWORDS.len() + 1);
 
-        for tok in tokens.iter().take(18) {
+        for tok in tokens.iter().take(KEYWORDS.len()) {
             match tok {
                 Token::Keyword(_, _, word) => {
                     if !KEYWORDS
@@ -582,23 +561,27 @@ mod tests {
             }
         }
 
-        assert_eq!(tokens[18], Token::Eof);
+        assert_eq!(tokens[KEYWORDS.len()], Token::Eof);
     }
 
     #[test]
     fn test_data_types() {
-        let mut lexer =
-            Lexer::new("u8 u16 u32 u64 i8 i16 i32 i64 f32 f64 u128 i128 f80 f128 char bool");
+        let mut input = String::new();
+        for string in DATA_TYPES {
+            input.push_str(string);
+            input.push_str(" ");
+        }
+        let mut lexer = Lexer::new(&input);
         let tokens = lexer.lex();
 
-        assert_eq!(tokens.len(), 17); // Ensure correct number of tokens
-        for token in tokens.iter().take(16) {
+        assert_eq!(tokens.len(), DATA_TYPES.len() + 1); // Ensure correct number of tokens
+        for token in tokens.iter().take(DATA_TYPES.len()) {
             match token {
                 Token::DataType(_, _, _) => {}
                 _ => panic!("Expected a data type, got {:?}", token),
             }
         }
-        assert_eq!(tokens[16], Token::Eof); // EOF
+        assert_eq!(tokens[DATA_TYPES.len()], Token::Eof);
     }
 
     #[test]
@@ -642,7 +625,7 @@ mod tests {
         let duration = start_time.elapsed();
 
         for i in 0..tokens.len() - 1 {
-            match &tokens[i] {
+            match tokens[i] {
                 Token::FloatLiteral(_, _, _) | Token::IntLiteral(_, _, _) => {}
                 _ => panic!("Expected a float or integer literal, found {}", &tokens[i]),
             }

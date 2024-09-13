@@ -1,162 +1,296 @@
-#[derive(Debug, Clone, PartialEq)]
+use crate::token::Token;
+use crate::utils::ParserError;
+use serde::{Deserialize, Serialize};
+
+/*
+ * The data structures defined here should all be heap-allocated, i.e. encapsulated
+ * with `Box`. When creating/modifying the data structures `Rc` or `Arc` should be used.
+ *
+ * Each structure should also account for whether an error was encountered during parsing.
+ */
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Identifier {
+    pub id: Option<Token>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Literal {
-    Integer(u128, Option<String>),
-    Float(f64, Option<String>),
-    String(String),
-    Char(char),
+    Integer(Token),
+    Float(Token),
+    String(Token),
+    Character(Token),
+    Error(ParserError),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum UnaryOp {
-    Plus,
-    Minus,
-    Not,
-    BitNot,
-    Ref,
-    Deref,
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ArrayAccess {
+    pub level: u32, // Reasonable limit for array accesses.
+    pub index: Box<Expression>,
+    pub next: Box<ArrayAccess>,
+    pub error: Option<ParserError>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum BinaryOp {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Modulus,
-    And,
-    Or,
-    Xor,
-    ShiftLeft,
-    ShiftRight,
-    Equal,
-    NotEqual,
-    LessThan,
-    LessThanOrEqual,
-    GreaterThan,
-    GreaterThanOrEqual,
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FunctionCall {
+    pub id: Box<Identifier>,
+    pub args: Vec<Box<Expression>>,
+    pub error: Option<ParserError>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum GenericParameter {
-    Simple(String),
-    Extends(String, String),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Type {
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    Int128,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
-    Uint128,
-    Float32,
-    Float64,
-    Float80,
-    Float128,
-    Char,
-    Bool,
-    Struct(String, Option<Vec<GenericParameter>>),
-    Enum(String),
-    Array(Box<Type>, Box<Literal>),
-    Identifier(String, Option<Vec<GenericParameter>>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Expression {
-    Literal(Literal),
-    Identifier(String),
-    UnaryOp(Box<UnaryOp>, Box<Expression>),
-    BinaryOp(Box<Expression>, Box<BinaryOp>, Box<Expression>),
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Primary {
+    Literal(Box<Literal>),
+    Identifier(Box<Identifier>),
     Group(Box<Expression>),
-    FunctionCall(String, Vec<Expression>),
+    ArrayAccess(Box<Identifier>, Box<ArrayAccess>),
+    FunctionCall(FunctionCall),
+    Error(ParserError),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Statement {
-    If(
-        Box<Expression>,
-        Box<Block>,
-        Vec<(Box<Expression>, Box<Block>)>,
-        Option<Box<Block>>,
-    ),
-    Loop(Box<Block>),
-    VariableDeclaration(Option<String>, Box<Type>, String, Option<Box<Expression>>),
-    Expression(Box<Expression>),
-    Return(Option<Box<Expression>>),
-    Match(
-        Box<Expression>,
-        Vec<(Vec<Literal>, Box<Block>)>,
-        Option<Box<Block>>,
-    ),
-    Break,
-    Continue,
-    Import(String),
-    Asm(Vec<AsmStatement>),
-    Llvm(Vec<LlvmStatement>),
-    FunctionCall(String, Vec<Expression>),
+/*
+ * Whatever operator precedence is used will be implemented in the Parser.
+ * This allows for a simplified and streamlined approach.
+ */
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Operator {
+    Binary(String, Box<Expression>, Box<Expression>),
+    Unary(String, Box<Expression>),
+    Error(ParserError),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct AsmStatement {
-    pub statement: String,
-    pub operands: Vec<String>,
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Expression {
+    Operation(Box<Operator>),
+    Primary(Box<Primary>),
+    Error(ParserError),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct LlvmStatement {
-    pub statement: String,
-    pub operands: Vec<String>,
+/*
+ * Generics
+ */
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum GenericVariants {
+    Identifier(Box<Identifier>),
+    Implements(Box<Identifier>, Box<Identifier>),
+    Error(ParserError),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GenericParameters {
+    pub generics: Vec<Box<GenericVariants>>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum TypeVariant {
+    Primitive(String), // e.g., "i32", "f64", etc.
+    Structure(Box<Identifier>, Option<Box<GenericParameters>>),
+    Enumeration(Box<Identifier>, Option<Box<GenericParameters>>),
+    Array(Box<TypeVariant>, Box<Expression>), // Array type with size
+    Reference(Box<TypeVariant>),              // Pointer/Reference type
+    Generic(Box<Identifier>),                 // Generic type
+    Interface(Box<Identifier>, Option<Box<GenericParameters>>), // Traits/Interfaces
+    Error(ParserError),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Type {
+    pub variant: Box<TypeVariant>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Block {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+/*
+ * Statements
+ */
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Assignment {
+    pub id: Box<Identifier>,
+    pub expr: Box<Expression>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct IfStatement {
+    pub condition: Box<Expression>,
+    pub if_block: Box<Block>,
+    pub elif_statements: Option<Vec<Box<ElifStatement>>>,
+    pub else_block: Option<Box<Block>>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ElifStatement {
+    pub condition: Box<Expression>,
+    pub block: Box<Block>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct VariableDeclaration {
+    pub state: u8, // whether volatile or const. 0 for none, 1 for volatile, 2 for const.
+    pub var_type: Box<Type>,
+    pub id: Box<Identifier>,
+    pub init: Box<Expression>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MatchStatement {
+    pub case_clauses: Vec<CaseClause>,
+    pub default_clause: Option<Box<Block>>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CaseClause {
+    pub cases: Vec<Literal>,
+    pub case_block: Box<Block>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ReturnStatement {
+    pub expr: Box<Expression>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum BlockStringLiteralVariant {
+    StringLiteral(Box<Literal>),
+    Identifier(Box<Identifier>),
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LLVMBlock {
+    pub statements: Vec<BlockStringLiteralVariant>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ASMBlock {
+    pub statements: Vec<BlockStringLiteralVariant>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Statement {
+    If(IfStatement),
+    Loop(Box<Block>),
+    Assign(Assignment),
+    Var(VariableDeclaration),
+    Match(MatchStatement),
+    Break,
+    Continue,
+    FunctionCall(FunctionCall),
+    LLVM(LLVMBlock),
+    ASM(ASMBlock),
+    Error(ParserError),
+}
+
+/*
+ * Common
+ */
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NamedFields {
+    pub fields: Vec<(Box<Type>, Box<Identifier>)>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TupleFields {
+    pub fields: Vec<Box<Type>>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum Variant {
+    Named(Box<Identifier>, Box<NamedFields>),
+    Tuple(Box<Identifier>, Box<TupleFields>),
+    Unit(Box<Identifier>),
+}
+
+/*
+ * Enumerations
+ */
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct EnumDeclaration {
+    pub id: Box<Identifier>,
+    pub generics: Option<Box<GenericParameters>>,
+    pub variants: Option<Vec<Variant>>,
+    pub error: Option<ParserError>,
+}
+
+/*
+ * Structures
+ */
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StructDeclaration {
+    pub variant: Box<Variant>, // Encapsulate the struct inside a variant
+    pub error: Option<ParserError>,
+}
+
+/*
+ * Functions
+ */
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FunctionDeclaration {
+    pub id: Box<Identifier>,
+    pub is_pub: bool,
+    pub is_const: bool,
+    pub generics: Option<Box<GenericParameters>>,
+    pub parameters: Option<Vec<(Box<Type>, Box<Identifier>)>>,
+    pub block: Box<Block>,
+    pub error: Option<ParserError>,
+}
+
+/*
+ * Defininitions
+ */
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct InterfaceDeclaration {
+    pub id: Box<Identifier>,
+    pub generics: Option<Box<GenericParameters>>,
+    pub methods: Vec<Box<FunctionDeclaration>>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct InterfaceImplementation {
+    pub intf_id: Box<Identifier>,
+    pub for_id: Box<Identifier>,
+    pub generics: Box<GenericParameters>,
+    pub methods: Vec<Box<FunctionDeclaration>>,
+    pub error: Option<ParserError>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Declaration {
-    Function(Box<FunctionDeclaration>),
     Enum(Box<EnumDeclaration>),
     Struct(Box<StructDeclaration>),
-    Asm(Box<AsmStatement>),
-    Llvm(Box<LlvmStatement>),
+    Function(Box<FunctionDeclaration>),
+    Interface(Box<InterfaceDeclaration>),
+    Error(ParserError),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct FunctionDeclaration {
-    pub name: String,
-    pub parameters: Vec<(Box<Type>, String)>,
-    pub return_type: Option<Box<Type>>,
-    pub body: Box<Block>,
-}
+/*
+ * The head or root of the syntax tree.
+ */
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct StructDeclaration {
-    pub name: String,
-    pub generic_parameters: Option<Vec<GenericParameter>>,
-    pub fields: Vec<(Box<Type>, String)>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct EnumDeclaration {
-    pub name: String,
-    pub generic_parameters: Option<Vec<GenericParameter>>,
-    pub variants: Vec<EnumVariant>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum EnumVariant {
-    Named(String, Vec<(Box<Type>, String)>),
-    Tuple(Vec<Box<Type>>),
-    Unit,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Program {
-    pub declarations: Vec<Declaration>,
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AST {
+    pub declarations: Vec<Box<Declaration>>,
 }

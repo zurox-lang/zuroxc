@@ -1,9 +1,10 @@
+use colored::*;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum LexerError {
     UnexpectedEOF(usize, usize, String),
-    //UnexpectedCharacter(usize, usize, String),
     InvalidBinary(usize, usize, String),
     InvalidOctal(usize, usize, String),
     InvalidDecimal(usize, usize, String),
@@ -18,104 +19,149 @@ impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LexerError::UnexpectedEOF(line, col, value) => {
-                write!(f, "Unexpected EOF at line {}, col {}: {}", line, col, value)
-            }
-            /* 
-            LexerError::UnexpectedCharacter(line, col, value) => {
                 write!(
                     f,
-                    "Unexpected character at line {}, col {}: {}",
-                    line, col, value
+                    "{} {} {} {}",
+                    "Unexpected EOF at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    value.blue()
                 )
-            }*/
+            }
             LexerError::InvalidBinary(line, col, value) => {
                 write!(
                     f,
-                    "Invalid binary number at line {}, col {}: {}",
-                    line, col, value
+                    "{} {} {} {}",
+                    "Invalid binary number at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    value.blue()
                 )
             }
             LexerError::InvalidOctal(line, col, value) => {
                 write!(
                     f,
-                    "Invalid octal number at line {}, col {}: {}",
-                    line, col, value
+                    "{} {} {} {}",
+                    "Invalid octal number at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    value.blue()
                 )
             }
             LexerError::InvalidDecimal(line, col, value) => {
                 write!(
                     f,
-                    "Invalid decimal number at line {}, col {}: {}",
-                    line, col, value
+                    "{} {} {} {}",
+                    "Invalid decimal number at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    value.blue()
                 )
             }
             LexerError::InvalidHexaDecimal(line, col, value) => {
                 write!(
                     f,
-                    "Invalid hexadecimal number at line {}, col {}: {}",
-                    line, col, value
+                    "{} {} {} {}",
+                    "Invalid hexadecimal number at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    value.blue()
                 )
             }
             LexerError::InvalidFloat(line, col, value) => {
                 write!(
                     f,
-                    "Invalid float number at line {}, col {}: {}",
-                    line, col, value
+                    "{} {} {} {}",
+                    "Invalid float number at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    value.blue()
                 )
             }
             LexerError::UnclosedString(line, col, value) => {
-                write!(f, "Unclosed string at line {}, col {}: {}", line, col, value)
+                write!(
+                    f,
+                    "{} {} {} {}",
+                    "Unclosed string literal at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    value.blue()
+                )
             }
             LexerError::UnclosedCharacter(line, col, value) => {
                 write!(
                     f,
-                    "Unclosed character at line {}, col {}: {}",
-                    line, col, value
+                    "{} {} {} {}",
+                    "Unclosed character at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    value.blue()
                 )
             }
             LexerError::UnclosedComment(line, col, value) => {
-                write!(f, "Unclosed comment at line {}, col {}: {}", line, col, value)
+                write!(
+                    f,
+                    "{} {} {} {}",
+                    "Unclosed comment at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    value.blue()
+                )
             }
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum ParserError {
-
+    UnexpectedToken(usize, usize, String),
+    MissingToken(usize, usize, String),
+    InvalidSyntax(usize, usize, String),
+    UnexpectedEOF(usize, usize, String),
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum SemanticError {}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum CodeGenError {}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Error {
-    LexErr(LexerError),
-    ParseErr(ParserError),
-    SemErr(SemanticError),
-    CodeGenErr(CodeGenError),
-}
-
-impl fmt::Display for Error {
+impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::LexErr(le) => {
-                write!(f, "Encountered the following error during lexical analysis: {}", le)
+            ParserError::UnexpectedToken(line, col, token) => {
+                write!(
+                    f,
+                    "{} {} {} {}",
+                    "Unexpected token at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    token.blue()
+                )
             }
-            Error::ParseErr(pe) => {
-                //write!(f, "Encountered the following error during parsing: {}", pe)
-                write!(f, "Encountered the following error during parsing: ")
+            ParserError::MissingToken(line, col, expected) => {
+                write!(
+                    f,
+                    "{} {} {} {}",
+                    "Missing expected token at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    expected.blue()
+                )
             }
-            Error::SemErr(se) => {
-                //write!(f, "Encountered the following error during semantic analysis: {}", se)
-                write!(f, "Encountered the following error during semantic analysis: ")
+            ParserError::InvalidSyntax(line, col, message) => {
+                write!(
+                    f,
+                    "{} {} {} {}",
+                    "Invalid syntax at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    message.blue()
+                )
             }
-            Error::CodeGenErr(ce) => {
-                //write!(f, "Encountered the following error code generation: {}", ce)
-                write!(f, "Encountered the following error during code generation: ")
+            ParserError::UnexpectedEOF(line, col, message) => {
+                write!(
+                    f,
+                    "{} {} {} {}",
+                    "Unexpected EOF while parsing at".red().bold(),
+                    format!("line {}, col {}", line, col).yellow(),
+                    "->".cyan(),
+                    message.blue()
+                )
             }
         }
     }
