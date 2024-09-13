@@ -5,3 +5,4 @@ pub mod parser;
 pub mod semantic;
 pub mod token;
 pub mod utils;
+pub mod ast;
