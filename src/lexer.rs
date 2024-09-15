@@ -391,9 +391,10 @@ impl<'a> Lexer<'a> {
                             self.advance();
                         }
                         self.has_error = true;
-                        self.tokens.push(Token::Error(LexerError::UnclosedComment(
-                            self.line, self.col, comment,
-                        )));
+                        self.tokens
+                            .push(Token::Error(LexerError::UnterminatedComment(
+                                self.line, self.col, comment,
+                            )));
                     }
                 }
             }
@@ -434,11 +435,12 @@ impl<'a> Lexer<'a> {
 
             if literal.chars().last().expect("Unable to fetch character.") != '"' {
                 self.has_error = true;
-                self.tokens.push(Token::Error(LexerError::UnclosedString(
-                    self.line,
-                    self.col - literal.len(),
-                    literal,
-                )));
+                self.tokens
+                    .push(Token::Error(LexerError::UnterminatedStringLiteral(
+                        self.line,
+                        self.col - literal.len(),
+                        literal,
+                    )));
                 return;
             }
 
@@ -485,11 +487,12 @@ impl<'a> Lexer<'a> {
 
             if literal.chars().last().expect("Unable to fetch character.") != '\'' {
                 self.has_error = true;
-                self.tokens.push(Token::Error(LexerError::UnclosedCharacter(
-                    self.line,
-                    self.col - literal.len(),
-                    literal,
-                )));
+                self.tokens
+                    .push(Token::Error(LexerError::UnterminatedCharacterLiteral(
+                        self.line,
+                        self.col - literal.len(),
+                        literal,
+                    )));
                 return;
             }
 

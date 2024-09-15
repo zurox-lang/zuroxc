@@ -1,87 +1,91 @@
 use crate::utils;
 use serde::{Deserialize, Serialize};
 
+/// Represents a token in the lexical analysis phase. 
+/// Each token stores its line, column, and lexeme value.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Token {
+    /// Data type token: (line, column, value)
     DataType(usize, usize, String),
+    /// Identifier token: (line, column, value)
     Identifier(usize, usize, String),
+    /// Separator token: (line, column, value)
     Separator(usize, usize, String),
+    /// Operator token: (line, column, value)
     Operator(usize, usize, String),
+    /// Keyword token: (line, column, value)
     Keyword(usize, usize, String),
 
+    /// Integer literal token: (line, column, value)
     IntLiteral(usize, usize, String),
+    /// Floating-point literal token: (line, column, value)
     FloatLiteral(usize, usize, String),
+    /// String literal token: (line, column, value)
     StringLiteral(usize, usize, String),
+    /// Character literal token: (line, column, value)
     CharLiteral(usize, usize, String),
 
-    /// Error token
+    /// Error token, representing an invalid or unrecognized token
     Error(utils::LexerError),
 
-    /// End of the file
+    /// End of the file (EOF) token, signifies the end of input
     Eof,
 }
 
 impl Token {
+    /// Returns the line number where the token occurs.
     pub fn get_line(&self) -> usize {
-        let line: usize;
         match &self {
-            Self::DataType(x, _, _)
-            | Self::Identifier(x, _, _)
-            | Self::Separator(x, _, _)
-            | Self::Operator(x, _, _)
-            | Self::Keyword(x, _, _)
-            | Self::IntLiteral(x, _, _)
-            | Self::CharLiteral(x, _, _)
-            | Self::FloatLiteral(x, _, _)
-            | Self::StringLiteral(x, _, _) => {
-                line = *x;
-            }
-            _ => return 0,
+            Self::DataType(line, _, _)
+            | Self::Identifier(line, _, _)
+            | Self::Separator(line, _, _)
+            | Self::Operator(line, _, _)
+            | Self::Keyword(line, _, _)
+            | Self::IntLiteral(line, _, _)
+            | Self::CharLiteral(line, _, _)
+            | Self::FloatLiteral(line, _, _)
+            | Self::StringLiteral(line, _, _) => *line,
+            _ => 0, // Return 0 if token type does not contain line information
         }
-        line
     }
 
+    /// Returns the column number where the token occurs.
     pub fn get_col(&self) -> usize {
-        let col: usize;
         match &self {
-            Self::DataType(_, x, _)
-            | Self::Identifier(_, x, _)
-            | Self::Separator(_, x, _)
-            | Self::Operator(_, x, _)
-            | Self::Keyword(_, x, _)
-            | Self::IntLiteral(_, x, _)
-            | Self::CharLiteral(_, x, _)
-            | Self::FloatLiteral(_, x, _)
-            | Self::StringLiteral(_, x, _) => {
-                col = *x;
-            }
-            _ => return 0,
+            Self::DataType(_, col, _)
+            | Self::Identifier(_, col, _)
+            | Self::Separator(_, col, _)
+            | Self::Operator(_, col, _)
+            | Self::Keyword(_, col, _)
+            | Self::IntLiteral(_, col, _)
+            | Self::CharLiteral(_, col, _)
+            | Self::FloatLiteral(_, col, _)
+            | Self::StringLiteral(_, col, _) => *col,
+            _ => 0, // Return 0 if token type does not contain column information
         }
-        col
     }
 
+    /// Returns the lexeme (value) of the token as a string slice.
     pub fn get_lexeme(&self) -> &str {
-        let string: &str;
         match &self {
-            Self::DataType(_, _, x)
-            | Self::Identifier(_, _, x)
-            | Self::Separator(_, _, x)
-            | Self::Operator(_, _, x)
-            | Self::Keyword(_, _, x)
-            | Self::IntLiteral(_, _, x)
-            | Self::CharLiteral(_, _, x)
-            | Self::FloatLiteral(_, _, x)
-            | Self::StringLiteral(_, _, x) => {
-                string = &x;
-            }
-            _ => return "",
+            Self::DataType(_, _, lexeme)
+            | Self::Identifier(_, _, lexeme)
+            | Self::Separator(_, _, lexeme)
+            | Self::Operator(_, _, lexeme)
+            | Self::Keyword(_, _, lexeme)
+            | Self::IntLiteral(_, _, lexeme)
+            | Self::CharLiteral(_, _, lexeme)
+            | Self::FloatLiteral(_, _, lexeme)
+            | Self::StringLiteral(_, _, lexeme) => lexeme,
+            _ => "", // Return empty string if token type does not contain a lexeme
         }
-        string
     }
 }
 
 use std::fmt;
-/* To be used for debugging only. */
+
+/// Implements the `Display` trait for `Token`, providing a human-readable 
+/// string representation of each token. This is especially useful for debugging.
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -105,9 +109,11 @@ impl fmt::Display for Token {
                 "Operator(line: {}, col: {}, value: {})",
                 line, col, value
             ),
-            Token::Keyword(line, col, ref value) => {
-                write!(f, "Keyword(line: {}, col: {}, value: {})", line, col, value)
-            }
+            Token::Keyword(line, col, ref value) => write!(
+                f,
+                "Keyword(line: {}, col: {}, value: {})",
+                line, col, value
+            ),
             Token::IntLiteral(line, col, ref value) => write!(
                 f,
                 "IntLiteral(line: {}, col: {}, value: {})",

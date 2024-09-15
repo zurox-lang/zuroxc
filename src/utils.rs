@@ -10,9 +10,9 @@ pub enum LexerError {
     InvalidDecimal(usize, usize, String),
     InvalidHexaDecimal(usize, usize, String),
     InvalidFloat(usize, usize, String),
-    UnclosedString(usize, usize, String),
-    UnclosedCharacter(usize, usize, String),
-    UnclosedComment(usize, usize, String),
+    UnterminatedStringLiteral(usize, usize, String),
+    UnterminatedCharacterLiteral(usize, usize, String),
+    UnterminatedComment(usize, usize, String),
 }
 
 impl fmt::Display for LexerError {
@@ -78,7 +78,7 @@ impl fmt::Display for LexerError {
                     value.blue()
                 )
             }
-            LexerError::UnclosedString(line, col, value) => {
+            LexerError::UnterminatedStringLiteral(line, col, value) => {
                 write!(
                     f,
                     "{} {} {} {}",
@@ -88,7 +88,7 @@ impl fmt::Display for LexerError {
                     value.blue()
                 )
             }
-            LexerError::UnclosedCharacter(line, col, value) => {
+            LexerError::UnterminatedCharacterLiteral(line, col, value) => {
                 write!(
                     f,
                     "{} {} {} {}",
@@ -98,7 +98,7 @@ impl fmt::Display for LexerError {
                     value.blue()
                 )
             }
-            LexerError::UnclosedComment(line, col, value) => {
+            LexerError::UnterminatedComment(line, col, value) => {
                 write!(
                     f,
                     "{} {} {} {}",
